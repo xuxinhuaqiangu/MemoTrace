@@ -1,64 +1,78 @@
-name: Build EXE with PyInstaller and Cache
+name: Build EXE with PyInstaller  # 工作流名称
 
+# 触发条件：推送到 master 分支或对 master 分支的 PR 时执行
 on:
   push:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
 
+# 环境变量：定义入口脚本路径（可根据项目修改）
 env:
   MAIN_SCRIPT: example/3-exporter.py
 
+# 权限配置（默认读取代码即可）
 permissions:
   contents: read
 
 jobs:
   build:
-    runs-on: windows-latest
-
+    runs-on: windows-latest  # 使用 Windows 系统打包（EXE 是 Windows 可执行文件）
     steps:
+      # 步骤1：拉取当前仓库代码
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4  # GitHub 官方的代码检出工具
 
+      # 步骤2：缓存 pip 依赖（加速安装）
       - name: Cache pip packages
-        uses: actions/cache@v4
+        uses: actions/cache@v4  # 缓存工具
         with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          path: ~/.cache/pip  # 缓存路径（Windows 系统 pip 缓存位置）
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}  # 缓存键（根据依赖文件变化更新）
           restore-keys: |
-            ${{ runner.os }}-pip-
+            ${{ runner.os }}-pip-  # 缓存未命中时的备选键
 
+      # 步骤3：配置 Python 环境
       - name: Setup Python 3.10
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v3  # Python 环境配置工具
         with:
-          python-version: "3.10"
+          python-version: "3.10"  # 指定 Python 版本（需与项目兼容）
 
+      # 步骤4：安装依赖（包括打包工具和项目依赖）
       - name: Install dependencies
         run: |
+          # 升级 pip
           python -m pip install --upgrade pip
+          # 安装打包工具 PyInstaller
           pip install pyinstaller
+          # 安装项目依赖（如果 requirements.txt 存在）
           if (Test-Path requirements.txt) {
             pip install -r requirements.txt
           }
 
+      # 步骤5：缓存 PyInstaller 输出目录（可选，加速重复构建）
       - name: Cache PyInstaller dist
         uses: actions/cache@v4
         with:
-          path: dist
-          key: ${{ runner.os }}-pyinstaller-dist-${{ github.sha }}
+          path: dist  # 打包输出目录
+          key: ${{ runner.os }}-pyinstaller-dist-${{ github.sha }}  # 根据 commit 哈希缓存
           restore-keys: |
             ${{ runner.os }}-pyinstaller-dist-
 
+      # 步骤6：执行打包命令
       - name: Build EXE
         run: |
           echo "开始打包 ${{ env.MAIN_SCRIPT }}"
+          # 核心打包命令：无控制台窗口 + 单文件输出
           pyinstaller --noconsole --onefile ${{ env.MAIN_SCRIPT }}
 
+      # 步骤7：查看打包结果（可选，用于调试）
       - name: Show output files
-        run: dir dist
+        run: dir dist  # 列出 dist 目录下的文件
 
+      # 步骤8：上传打包产物（作为 Artifact 保存）
       - name: Upload EXE Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4  # 产物上传工具
         with:
-          name: memotrace-exe
-          path: dist/3-exporter.exe
+          name: memotrace-exe  # 产物名称
+          path: dist/3-exporter.exe  # 产物路径（根据入口脚本名称自动生成）
